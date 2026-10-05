@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Thermometer OTA</string>
+    <string name="title_activity_main">Thermometer OTA</string>
+    <string name="package_name">com.balloonware.thermometerota</string>
+    <string name="custom_url_scheme">com.balloonware.thermometerota</string>
+</resources>

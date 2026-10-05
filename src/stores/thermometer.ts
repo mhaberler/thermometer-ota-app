@@ -1,0 +1,162 @@
+import { BleClient } from '@capacitor-community/bluetooth-le'
+import { defineStore } from 'pinia'
+import { ref, shallowRef } from 'vue'
+import { deviceMode, otaTransport, scanFor, type DeviceMode } from '@/lib/ble'
+import { downloadGbl } from '@/lib/download'
+import { runOta, type OtaPhase } from '@/lib/ota'
+import { parseTemperature, type Temperature } from '@/lib/temperature'
+import {
+  DEVICE_INFORMATION_SVC, FIRMWARE_REVISION_CHAR,
+  HEALTH_THERMOMETER_SVC, TEMPERATURE_MEASUREMENT_CHAR,
+} from '@/lib/uuids'
+
+const SCAN_SECONDS = 10
+const REBOOT_SCAN_TIMEOUT_MS = 30000
+
+export interface FoundDevice {
+  deviceId: string
+  name: string
+  rssi: number | null
+  mode: DeviceMode
+}
+
+export const useThermometerStore = defineStore('thermometer', () => {
+  const devices = ref<FoundDevice[]>([])
+  const scanning = ref(false)
+  const busy = ref(false)
+  const error = ref('')
+
+  // Selected device: connected application, or a device waiting in Apploader mode.
+  const device = ref<FoundDevice | null>(null)
+  const temperature = ref<Temperature | null>(null)
+  const firmware = ref('')
+  const previousFirmware = ref('')
+
+  const url = ref('')
+  const image = shallowRef<Uint8Array | null>(null)
+  const otaPhase = ref<OtaPhase | null>(null)
+  const progress = ref(0)
+
+  let initialized = false
+  async function init() {
+    if (initialized) return
+    await BleClient.initialize({ androidNeverForLocation: true })
+    initialized = true
+  }
+
+  // Run an action with busy flag and error reporting.
+  async function guarded(action: () => Promise<void>) {
+    busy.value = true
+    error.value = ''
+    try {
+      await action()
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : String(err)
+    } finally {
+      busy.value = false
+    }
+  }
+
+  async function scan() {
+    error.value = ''
+    try {
+      await init()
+      devices.value = []
+      scanning.value = true
+      await BleClient.requestLEScan({}, (result) => {
+        const mode = deviceMode(result)
+        if (!mode || devices.value.some(d => d.deviceId === result.device.deviceId)) return
+        devices.value.push({
+          deviceId: result.device.deviceId,
+          name: result.localName ?? result.device.name ?? '',
+          rssi: result.rssi ?? null,
+          mode,
+        })
+      })
+      setTimeout(stopScan, SCAN_SECONDS * 1000)
+    } catch (err: unknown) {
+      scanning.value = false
+      error.value = err instanceof Error ? err.message : String(err)
+    }
+  }
+
+  async function stopScan() {
+    if (!scanning.value) return
+    scanning.value = false
+    await BleClient.stopLEScan().catch(() => {})
+  }
+
+  async function connectApp(deviceId: string) {
+    await BleClient.connect(deviceId, () => {
+      // Disconnects during an update are part of the procedure.
+      if (otaPhase.value === null) device.value = null
+    })
+    const fw = await BleClient.read(deviceId, DEVICE_INFORMATION_SVC, FIRMWARE_REVISION_CHAR)
+    firmware.value = new TextDecoder().decode(fw)
+    temperature.value = null
+    await BleClient.startNotifications(
+      deviceId, HEALTH_THERMOMETER_SVC, TEMPERATURE_MEASUREMENT_CHAR,
+      (value) => { temperature.value = parseTemperature(value) },
+    )
+  }
+
+  async function select(found: FoundDevice) {
+    await stopScan()
+    await guarded(async () => {
+      previousFirmware.value = ''
+      if (found.mode === 'app') await connectApp(found.deviceId)
+      device.value = found
+    })
+  }
+
+  async function disconnect() {
+    const current = device.value
+    device.value = null
+    if (current?.mode === 'app') await BleClient.disconnect(current.deviceId).catch(() => {})
+  }
+
+  async function download() {
+    await guarded(async () => {
+      image.value = null
+      image.value = await downloadGbl(url.value.trim())
+    })
+  }
+
+  async function update() {
+    const current = device.value
+    const gbl = image.value
+    if (!current || !gbl) return
+
+    await guarded(async () => {
+      progress.value = 0
+      otaPhase.value = 'rebooting'
+      try {
+        const inApploader = current.mode === 'apploader'
+        previousFirmware.value = inApploader ? '' : firmware.value
+        await runOta(otaTransport, {
+          appDeviceId: inApploader ? null : current.deviceId,
+          apploaderDeviceId: inApploader ? current.deviceId : undefined,
+          image: gbl,
+          onPhase: (phase) => { otaPhase.value = phase },
+          onProgress: (sent, total) => { progress.value = sent / total },
+        })
+
+        // Wait for the new application to come up, then reconnect to it.
+        const deviceId = await scanFor(r => deviceMode(r) === 'app', REBOOT_SCAN_TIMEOUT_MS)
+        await connectApp(deviceId)
+        device.value = { ...current, deviceId, mode: 'app' }
+      } catch (err) {
+        device.value = null
+        throw err
+      } finally {
+        otaPhase.value = null
+      }
+    })
+  }
+
+  return {
+    devices, scanning, busy, error, device, temperature, firmware, previousFirmware,
+    url, image, otaPhase, progress,
+    scan, stopScan, select, disconnect, download, update,
+  }
+})

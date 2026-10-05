@@ -1,0 +1,42 @@
+{
+  "name": "thermometer-ota-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Thermometer reader and BLE OTA updater for bt_soc_thermometer_mock",
+  "config": {
+    "port": "8100"
+  },
+  "scripts": {
+    "dev": "vite --port=$npm_package_config_port --host",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "build-dev": "vue-tsc && vite build --mode development",
+    "build-prod": "vue-tsc && vite build --mode production",
+    "debug-android-s24": "bunx cap run android  --live-reload  --port $npm_package_config_port --target R3CX90A30EW",
+    "debug-ios-i16": "  bunx cap run ios --live-reload --port $npm_package_config_port  --target 00008140-0002692C1E79801C",
+    "run-on-galaxy-s24": "bunx cap run android --target R3CX90A30EW",
+    "run-on-i16": "bunx cap run ios --target 00008140-0002692C1E79801C",
+    "open-in-Xcode": "bunx cap open ios",
+    "open-in-Android-Studio": "bunx cap open android",
+    "sync": "eval \"$(rbenv init - zsh)\" && bunx cap sync"
+  },
+  "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.2.0",
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/ios": "^8.3.4",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.34"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
+    "@types/node": "^24.12.3",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/tsconfig": "^0.9.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12",
+    "vitest": "^4.0.0",
+    "vue-tsc": "^3.2.8"
+  }
+}
