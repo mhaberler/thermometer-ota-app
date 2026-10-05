@@ -1,7 +1,7 @@
 {
   "name": "thermometer-ota-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Thermometer reader and BLE OTA updater for bt_soc_thermometer_mock",
   "config": {

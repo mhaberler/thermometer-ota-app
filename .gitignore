@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .cc-history
+
+.env
+
+# Gradle wrapper jar is needed by CI (a global *.jar ignore would drop it)
+!android/gradle/wrapper/gradle-wrapper.jar
