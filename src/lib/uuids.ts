@@ -4,6 +4,9 @@ export const TEMPERATURE_MEASUREMENT_CHAR = '00002a1c-0000-1000-8000-00805f9b34f
 export const DEVICE_INFORMATION_SVC = '0000180a-0000-1000-8000-00805f9b34fb'
 export const FIRMWARE_REVISION_CHAR = '00002a26-0000-1000-8000-00805f9b34fb'
 
+// BTHome service data in the advertisement
+export const BTHOME_SVC = '0000fcd2-0000-1000-8000-00805f9b34fb'
+
 // Silicon Labs OTA service
 export const OTA_SVC = '1d14d6ee-fd63-4fa1-bfa4-8f47b42119f0'
 export const OTA_CONTROL_CHAR = 'f7bf3564-fb6d-4e53-88a4-5e37e0326063'

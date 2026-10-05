@@ -2,7 +2,7 @@
 
 A phone app for the [bt_soc_thermometer_mock](https://github.com/mhaberler/bt_soc_thermometer_mock) firmware (Silicon Labs BGM220, Bluetooth LE). It
 
-- scans for the thermometer,
+- scans for the thermometer and shows temperature and firmware version of each device in range, without connecting,
 - connects and shows the temperature and the firmware version,
 - checks the firmware repository for a newer release and offers it,
 - updates the firmware over Bluetooth (OTA), from a release or from any URL.
@@ -20,6 +20,7 @@ What this app relies on:
 | Device feature | UUID | Use |
 |----------------|------|-----|
 | Health Thermometer service | `1809` | Found in the advertisement; identifies the thermometer |
+| BTHome v2 service data | `FCD2` | In the advertisement: temperature and firmware version (firmware 1.1.0 and later) |
 | Temperature Measurement | `2A1C` | Indications, one per second |
 | Firmware Revision String | `2A26` | Running firmware version, e.g. `1.0.1` |
 | Silicon Labs OTA service | `1D14D6EE-FD63-4FA1-BFA4-8F47B42119F0` | Firmware update |
@@ -30,7 +31,7 @@ Firmware releases come from `https://api.github.com/repos/mhaberler/bt_soc_therm
 
 ## Using the app
 
-1. **Scan.** Thermometers in range are listed. A device that was left in update mode by an interrupted update is listed too, marked "update mode".
+1. **Scan.** Thermometers in range are listed, with the temperature and firmware version they broadcast (firmware 1.1.0 and later; the values update while the scan runs). A device that was left in update mode by an interrupted update is listed too, marked "update mode".
 2. **Tap a device.** The app connects and shows temperature and firmware version.
 3. **Firmware update.** One of:
    - "Update to X.Y.Z available": a newer release exists. Tap the button; the app downloads the image and runs the update.
@@ -65,6 +66,7 @@ src/
     ble.ts                Bluetooth plugin glue, scan classification
     ota.ts                update procedure, independent of the Bluetooth plugin
     temperature.ts        decodes the temperature measurement (IEEE 11073 float)
+    bthome.ts             decodes temperature and firmware version from the advertisement
     gbl.ts                checks that a download is a GBL file
     download.ts           fetches a GBL file with native HTTP
     release.ts            looks up the latest firmware release on GitHub

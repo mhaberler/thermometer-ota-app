@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parseBthome } from './bthome'
 import { isGbl } from './gbl'
 import { runOta, type OtaPhase, type OtaTransport } from './ota'
 import { pickRelease } from './release'
@@ -156,5 +157,34 @@ describe('pickRelease', () => {
     expect(pickRelease({ tag_name: 'v1.0.1', assets: [asset('fw.s37')] })).toBeNull()
     expect(pickRelease({ message: 'Not Found' })).toBeNull()
     expect(pickRelease(null)).toBeNull()
+  })
+})
+
+describe('parseBthome', () => {
+  const bytes = (hex: string) =>
+    new DataView(Uint8Array.from(hex.match(/../g) ?? [], b => parseInt(b, 16)).buffer)
+
+  // Service data as produced by the firmware (bthome.h)
+  it('decodes temperature and firmware version', () => {
+    expect(parseBthome(bytes('4002c409f2000101'))).toEqual({ temperature: 25, firmware: '1.1.0' })
+    expect(parseBthome(bytes('400230f8f20a0001'))).toEqual({ temperature: -20, firmware: '1.0.10' })
+  })
+
+  it('decodes what is there', () => {
+    expect(parseBthome(bytes('4002c409'))).toEqual({ temperature: 25 })
+    expect(parseBthome(bytes('40f2000106'))).toEqual({ firmware: '6.1.0' })
+    expect(parseBthome(bytes('40'))).toEqual({})
+  })
+
+  it('stops at objects it does not know and at truncated data', () => {
+    // 0x03 humidity follows the temperature
+    expect(parseBthome(bytes('4002c40903bf13f2000101'))).toEqual({ temperature: 25 })
+    expect(parseBthome(bytes('4002c409f20001'))).toEqual({ temperature: 25 })
+  })
+
+  it('rejects encrypted data, other versions and empty data', () => {
+    expect(parseBthome(bytes('4102c409'))).toBeNull()
+    expect(parseBthome(bytes('2002c409'))).toBeNull()
+    expect(parseBthome(bytes(''))).toBeNull()
   })
 })

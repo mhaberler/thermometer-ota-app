@@ -39,6 +39,8 @@ const temperatureText = computed(() => {
             </span>
             <span class="meta">
               <em v-if="d.mode === 'apploader'">update mode</em>
+              <strong v-if="d.temperature !== undefined">{{ d.temperature.toFixed(1) }} °C</strong>
+              <small v-if="d.firmware">Firmware {{ d.firmware }}</small>
               <small v-if="d.rssi !== null">{{ d.rssi }} dBm</small>
             </span>
           </li>

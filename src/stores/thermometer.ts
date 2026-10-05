@@ -2,13 +2,14 @@ import { BleClient } from '@capacitor-community/bluetooth-le'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import { deviceMode, otaTransport, scanFor, type DeviceMode } from '@/lib/ble'
+import { parseBthome } from '@/lib/bthome'
 import { downloadGbl } from '@/lib/download'
 import { runOta, type OtaPhase } from '@/lib/ota'
 import { fetchLatestRelease, type Release } from '@/lib/release'
 import { parseTemperature, type Temperature } from '@/lib/temperature'
 import { isNewer } from '@/lib/version'
 import {
-  DEVICE_INFORMATION_SVC, FIRMWARE_REVISION_CHAR,
+  BTHOME_SVC, DEVICE_INFORMATION_SVC, FIRMWARE_REVISION_CHAR,
   HEALTH_THERMOMETER_SVC, TEMPERATURE_MEASUREMENT_CHAR,
 } from '@/lib/uuids'
 
@@ -20,6 +21,9 @@ export interface FoundDevice {
   name: string
   rssi: number | null
   mode: DeviceMode
+  // Broadcast by the device (BTHome), available without connecting
+  temperature?: number
+  firmware?: string
 }
 
 export const useThermometerStore = defineStore('thermometer', () => {
@@ -85,15 +89,25 @@ export const useThermometerStore = defineStore('thermometer', () => {
       await init()
       devices.value = []
       scanning.value = true
-      await BleClient.requestLEScan({}, (result) => {
+      // Duplicates are wanted: every advertisement carries a new temperature.
+      await BleClient.requestLEScan({ allowDuplicates: true }, (result) => {
         const mode = deviceMode(result)
-        if (!mode || devices.value.some(d => d.deviceId === result.device.deviceId)) return
-        devices.value.push({
+        if (!mode) return
+        const serviceData = result.serviceData?.[BTHOME_SVC]
+        const found: FoundDevice = {
           deviceId: result.device.deviceId,
           name: result.localName ?? result.device.name ?? '',
           rssi: result.rssi ?? null,
           mode,
-        })
+          ...(serviceData ? parseBthome(serviceData) : null),
+        }
+        const index = devices.value.findIndex(d => d.deviceId === found.deviceId)
+        if (index < 0) {
+          devices.value.push(found)
+        } else {
+          // The name comes with the scan response, which not every result includes.
+          devices.value[index] = { ...found, name: found.name || devices.value[index].name }
+        }
       })
       setTimeout(stopScan, SCAN_SECONDS * 1000)
     } catch (err: unknown) {
