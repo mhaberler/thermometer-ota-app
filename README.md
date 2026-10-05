@@ -9,7 +9,7 @@ A phone app for the [bt_soc_thermometer_mock](https://github.com/mhaberler/bt_so
 
 Built with Capacitor 8, Vue 3, TypeScript, Pinia and [@capacitor-community/bluetooth-le](https://github.com/capacitor-community/bluetooth-le). Runs on Android and iOS.
 
-**Status:** working. Scanning, reading and the firmware update have been verified on hardware with Android and iOS. The app is signed and released for both platforms.
+**Status:** working. Scanning (including the broadcast temperature and firmware version), reading and the firmware update have been verified on hardware with Android and iOS. The app is signed and released for both platforms.
 
 ## How it relates to the firmware
 
