@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { isGbl } from './gbl'
 import { runOta, type OtaPhase, type OtaTransport } from './ota'
+import { pickRelease } from './release'
 import { parseTemperature } from './temperature'
 import { OTA_CONTROL_CHAR, OTA_DATA_CHAR } from './uuids'
+import { isNewer, parseVersion } from './version'
 
 function measurement(...bytes: number[]) {
   return new DataView(Uint8Array.from(bytes).buffer)
@@ -113,5 +115,46 @@ describe('runOta', () => {
 
     expect(log.at(-1)).toBe('disconnect btl')
     expect(log).not.toContain('control btl 3')
+  })
+})
+
+describe('version', () => {
+  it('parses MAJOR.MINOR.PATCH with optional v', () => {
+    expect(parseVersion('1.2.3')).toEqual([1, 2, 3])
+    expect(parseVersion('v10.0.7')).toEqual([10, 0, 7])
+    expect(parseVersion('v4')).toBeNull()
+    expect(parseVersion('1.2')).toBeNull()
+    expect(parseVersion('')).toBeNull()
+  })
+
+  it('compares numerically, not as text', () => {
+    expect(isNewer('1.0.10', '1.0.9')).toBe(true)
+    expect(isNewer('2.0.0', '1.9.9')).toBe(true)
+    expect(isNewer('1.0.1', '1.0.1')).toBe(false)
+    expect(isNewer('1.0.0', '1.0.1')).toBe(false)
+  })
+
+  it('treats an unparseable device version as older', () => {
+    expect(isNewer('1.0.0', 'v4')).toBe(true)
+    expect(isNewer('1.0.0', '')).toBe(true)
+  })
+
+  it('never offers an unparseable release', () => {
+    expect(isNewer('nightly', '1.0.0')).toBe(false)
+  })
+})
+
+describe('pickRelease', () => {
+  const asset = (name: string) => ({ name, browser_download_url: `https://example.com/${name}` })
+
+  it('takes the tag and the GBL asset', () => {
+    const json = { tag_name: 'v1.0.1', assets: [asset('fw.s37'), asset('fw.gbl')] }
+    expect(pickRelease(json)).toEqual({ version: '1.0.1', url: 'https://example.com/fw.gbl' })
+  })
+
+  it('returns null without a GBL asset or for unexpected data', () => {
+    expect(pickRelease({ tag_name: 'v1.0.1', assets: [asset('fw.s37')] })).toBeNull()
+    expect(pickRelease({ message: 'Not Found' })).toBeNull()
+    expect(pickRelease(null)).toBeNull()
   })
 })

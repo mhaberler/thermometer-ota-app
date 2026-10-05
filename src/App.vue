@@ -63,6 +63,16 @@ const temperatureText = computed(() => {
 
         <section>
           <h2>Firmware update</h2>
+          <template v-if="store.updateAvailable">
+            <p>Update to <strong>{{ store.release?.version }}</strong> available.</p>
+            <button :disabled="store.busy" @click="store.updateFromRelease()">
+              Update to {{ store.release?.version }}
+            </button>
+          </template>
+          <p v-else-if="store.release" class="hint">Firmware is up to date.</p>
+          <p v-if="store.releaseNote" class="hint">{{ store.releaseNote }}</p>
+
+          <h3>From URL</h3>
           <input
             v-model="store.url" type="url" inputmode="url" autocapitalize="off" autocorrect="off"
             placeholder="http://host:8000/firmware.gbl" :disabled="store.busy"

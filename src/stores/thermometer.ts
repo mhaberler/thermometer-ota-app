@@ -1,10 +1,12 @@
 import { BleClient } from '@capacitor-community/bluetooth-le'
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { deviceMode, otaTransport, scanFor, type DeviceMode } from '@/lib/ble'
 import { downloadGbl } from '@/lib/download'
 import { runOta, type OtaPhase } from '@/lib/ota'
+import { fetchLatestRelease, type Release } from '@/lib/release'
 import { parseTemperature, type Temperature } from '@/lib/temperature'
+import { isNewer } from '@/lib/version'
 import {
   DEVICE_INFORMATION_SVC, FIRMWARE_REVISION_CHAR,
   HEALTH_THERMOMETER_SVC, TEMPERATURE_MEASUREMENT_CHAR,
@@ -32,6 +34,14 @@ export const useThermometerStore = defineStore('thermometer', () => {
   const firmware = ref('')
   const previousFirmware = ref('')
 
+  // Latest published firmware release
+  const release = ref<Release | null>(null)
+  const releaseNote = ref('')
+  // A device in Apploader mode has no firmware; any release is an update.
+  const updateAvailable = computed(() =>
+    release.value !== null && device.value !== null
+    && (device.value.mode === 'apploader' || isNewer(release.value.version, firmware.value)))
+
   const url = ref('')
   const image = shallowRef<Uint8Array | null>(null)
   const otaPhase = ref<OtaPhase | null>(null)
@@ -54,6 +64,18 @@ export const useThermometerStore = defineStore('thermometer', () => {
       error.value = err instanceof Error ? err.message : String(err)
     } finally {
       busy.value = false
+    }
+  }
+
+  // Look up the latest release. Failure is reported but does not affect the connection.
+  async function checkRelease() {
+    releaseNote.value = ''
+    try {
+      release.value = await fetchLatestRelease()
+      if (!release.value) releaseNote.value = 'No firmware release published.'
+    } catch (err: unknown) {
+      release.value = null
+      releaseNote.value = `Release check failed: ${err instanceof Error ? err.message : String(err)}`
     }
   }
 
@@ -98,6 +120,7 @@ export const useThermometerStore = defineStore('thermometer', () => {
       deviceId, HEALTH_THERMOMETER_SVC, TEMPERATURE_MEASUREMENT_CHAR,
       (value) => { temperature.value = parseTemperature(value) },
     )
+    void checkRelease()
   }
 
   async function select(found: FoundDevice) {
@@ -105,6 +128,7 @@ export const useThermometerStore = defineStore('thermometer', () => {
     await guarded(async () => {
       previousFirmware.value = ''
       if (found.mode === 'app') await connectApp(found.deviceId)
+      else void checkRelease()
       device.value = found
     })
   }
@@ -154,9 +178,19 @@ export const useThermometerStore = defineStore('thermometer', () => {
     })
   }
 
+  async function updateFromRelease() {
+    const latest = release.value
+    if (!latest) return
+    await guarded(async () => {
+      image.value = null
+      image.value = await downloadGbl(latest.url)
+    })
+    if (image.value) await update()
+  }
+
   return {
     devices, scanning, busy, error, device, temperature, firmware, previousFirmware,
-    url, image, otaPhase, progress,
-    scan, stopScan, select, disconnect, download, update,
+    release, releaseNote, updateAvailable, url, image, otaPhase, progress,
+    scan, stopScan, select, disconnect, download, update, updateFromRelease,
   }
 })
