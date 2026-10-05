@@ -9,7 +9,7 @@ A phone app for the [bt_soc_thermometer_mock](https://github.com/mhaberler/bt_so
 
 Built with Capacitor 8, Vue 3, TypeScript, Pinia and [@capacitor-community/bluetooth-le](https://github.com/capacitor-community/bluetooth-le). Runs on Android and iOS.
 
-**Status:** the app builds, is signed and is released for both platforms, and the logic that needs no phone is covered by unit tests. The Bluetooth and update flow has not yet been confirmed on a real phone.
+**Status:** working. Scanning, reading and the firmware update have been verified on hardware with Android and iOS. The app is signed and released for both platforms.
 
 ## How it relates to the firmware
 
@@ -184,6 +184,6 @@ Local release builds are unsigned unless `ANDROID_KEYSTORE_PATH` and the three p
 - **Plain HTTP is allowed everywhere** (`usesCleartextTraffic` on Android, `NSAllowsArbitraryLoads` on iOS) so that images can be served from a development machine. Tighten this before any public distribution.
 - **No check of who may update.** The firmware accepts an update from any connected client, and images are neither signed nor encrypted.
 - **One device at a time.** After an update the app reconnects to the first thermometer it sees, and in update mode it takes the first device advertising as `OTA`. With several devices in range it may pick another one.
-- **iOS** may show stale services after the device switches to update mode, and cannot scan in the background. Untested so far.
+- **iOS** cannot scan in the background, so the app must stay in the foreground during an update.
 - **GitHub API limit:** release lookups are unauthenticated, 60 per hour per IP address.
 - Firmware images older than the first tagged release report the Bluetooth stack version as firmware version and may look newer than any release. Update those once from a URL.
